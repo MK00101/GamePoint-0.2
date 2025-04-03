@@ -7,6 +7,8 @@ import {
   referrals, Referral, InsertReferral,
   earnings, Earning, InsertEarning
 } from "@shared/schema";
+import { db } from "./db";
+import { eq } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -316,4 +318,214 @@ export class MemStorage implements IStorage {
   }
 }
 
-export const storage = new MemStorage();
+// DatabaseStorage implementation
+export class DatabaseStorage implements IStorage {
+  async getUser(id: number): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user || undefined;
+  }
+
+  async getUserByUsername(username: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.username, username));
+    return user || undefined;
+  }
+
+  async getUserByEmail(email: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.email, email));
+    return user || undefined;
+  }
+
+  async createUser(insertUser: InsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(insertUser)
+      .returning();
+    return user;
+  }
+
+  async getGameTypes(): Promise<GameType[]> {
+    return await db.select().from(gameTypes);
+  }
+
+  async getGameType(id: number): Promise<GameType | undefined> {
+    const [gameType] = await db.select().from(gameTypes).where(eq(gameTypes.id, id));
+    return gameType || undefined;
+  }
+
+  async createGameType(gameType: InsertGameType): Promise<GameType> {
+    const [newGameType] = await db
+      .insert(gameTypes)
+      .values(gameType)
+      .returning();
+    return newGameType;
+  }
+
+  async getTournamentStructures(): Promise<TournamentStructure[]> {
+    return await db.select().from(tournamentStructures);
+  }
+
+  async getTournamentStructure(id: number): Promise<TournamentStructure | undefined> {
+    const [structure] = await db.select().from(tournamentStructures).where(eq(tournamentStructures.id, id));
+    return structure || undefined;
+  }
+
+  async createTournamentStructure(structure: InsertTournamentStructure): Promise<TournamentStructure> {
+    const [newStructure] = await db
+      .insert(tournamentStructures)
+      .values(structure)
+      .returning();
+    return newStructure;
+  }
+
+  async getGames(): Promise<Game[]> {
+    return await db.select().from(games);
+  }
+
+  async getGamesByStatus(status: string): Promise<Game[]> {
+    return await db.select().from(games).where(eq(games.status, status));
+  }
+
+  async getGamesByUser(userId: number): Promise<Game[]> {
+    const gamesWithParticipants = await db
+      .select({
+        game: games
+      })
+      .from(games)
+      .innerJoin(gameParticipants, eq(games.id, gameParticipants.gameId))
+      .where(eq(gameParticipants.userId, userId));
+    
+    return gamesWithParticipants.map(gp => gp.game);
+  }
+
+  async getGamesCreatedByUser(userId: number): Promise<Game[]> {
+    return await db.select().from(games).where(eq(games.gameMasterId, userId));
+  }
+
+  async getGame(id: number): Promise<Game | undefined> {
+    const [game] = await db.select().from(games).where(eq(games.id, id));
+    return game || undefined;
+  }
+
+  async createGame(game: InsertGame): Promise<Game> {
+    // Calculate prize pool
+    const prizePool = game.entryFee * game.maxPlayers;
+    
+    const [newGame] = await db
+      .insert(games)
+      .values({
+        ...game,
+        prizePool,
+        currentPlayers: 0
+      })
+      .returning();
+    
+    return newGame;
+  }
+
+  async updateGameStatus(id: number, status: string): Promise<Game | undefined> {
+    const [updatedGame] = await db
+      .update(games)
+      .set({ status })
+      .where(eq(games.id, id))
+      .returning();
+    
+    return updatedGame || undefined;
+  }
+
+  async getGameParticipants(gameId: number): Promise<GameParticipant[]> {
+    return await db.select().from(gameParticipants).where(eq(gameParticipants.gameId, gameId));
+  }
+
+  async getGameParticipant(gameId: number, userId: number): Promise<GameParticipant | undefined> {
+    const [participant] = await db
+      .select()
+      .from(gameParticipants)
+      .where(eq(gameParticipants.gameId, gameId) && eq(gameParticipants.userId, userId));
+    
+    return participant || undefined;
+  }
+
+  async createGameParticipant(participant: InsertGameParticipant): Promise<GameParticipant> {
+    // First get the current game to get player count
+    const [game] = await db
+      .select()
+      .from(games)
+      .where(eq(games.id, participant.gameId));
+    
+    // Update the current players
+    await db
+      .update(games)
+      .set({
+        currentPlayers: (game.currentPlayers || 0) + 1
+      })
+      .where(eq(games.id, participant.gameId));
+    
+    // Then create the participant
+    const [newParticipant] = await db
+      .insert(gameParticipants)
+      .values(participant)
+      .returning();
+    
+    return newParticipant;
+  }
+
+  async updateParticipantPaymentStatus(id: number, hasPaid: boolean): Promise<GameParticipant | undefined> {
+    const [updatedParticipant] = await db
+      .update(gameParticipants)
+      .set({ hasPaid })
+      .where(eq(gameParticipants.id, id))
+      .returning();
+    
+    return updatedParticipant || undefined;
+  }
+
+  async getReferralsByUser(userId: number): Promise<Referral[]> {
+    return await db.select().from(referrals).where(eq(referrals.referrerId, userId));
+  }
+
+  async createReferral(referral: InsertReferral): Promise<Referral> {
+    const [newReferral] = await db
+      .insert(referrals)
+      .values({
+        ...referral,
+        earnings: 0
+      })
+      .returning();
+    
+    return newReferral;
+  }
+
+  async updateReferralEarnings(id: number, earnings: number): Promise<Referral | undefined> {
+    const [updatedReferral] = await db
+      .update(referrals)
+      .set({ earnings })
+      .where(eq(referrals.id, id))
+      .returning();
+    
+    return updatedReferral || undefined;
+  }
+
+  async getUserEarnings(userId: number): Promise<Earning[]> {
+    return await db.select().from(earnings).where(eq(earnings.userId, userId));
+  }
+
+  async createEarning(earning: InsertEarning): Promise<Earning> {
+    const [newEarning] = await db
+      .insert(earnings)
+      .values(earning)
+      .returning();
+    
+    return newEarning;
+  }
+
+  async getTotalEarnings(userId: number): Promise<number> {
+    const userEarnings = await db
+      .select()
+      .from(earnings)
+      .where(eq(earnings.userId, userId));
+    
+    return userEarnings.reduce((sum, earning) => sum + Number(earning.amount), 0);
+  }
+}
+
+export const storage = new DatabaseStorage();

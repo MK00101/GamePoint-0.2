@@ -1,4 +1,5 @@
 import { pgTable, text, serial, integer, boolean, timestamp, doublePrecision } from "drizzle-orm/pg-core";
+import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -119,6 +120,92 @@ export const insertEarningSchema = createInsertSchema(earnings).pick({
   amount: true,
   type: true,
 });
+
+// Define relations
+export const usersRelations = relations(users, ({ many }) => ({
+  createdGames: many(games, { relationName: "gameMaster" }),
+  participatedGames: many(gameParticipants, { relationName: "participant" }),
+  referrals: many(referrals, { relationName: "referrer" }),
+  referredBy: many(referrals, { relationName: "referredUser" }),
+  earnings: many(earnings, { relationName: "earner" }),
+}));
+
+export const gameTypesRelations = relations(gameTypes, ({ many }) => ({
+  games: many(games, { relationName: "gameType" }),
+}));
+
+export const tournamentStructuresRelations = relations(tournamentStructures, ({ many }) => ({
+  games: many(games, { relationName: "structure" }),
+}));
+
+export const gamesRelations = relations(games, ({ one, many }) => ({
+  gameMaster: one(users, {
+    fields: [games.gameMasterId],
+    references: [users.id],
+    relationName: "gameMaster"
+  }),
+  gameType: one(gameTypes, {
+    fields: [games.gameTypeId],
+    references: [gameTypes.id],
+    relationName: "gameType"
+  }),
+  structure: one(tournamentStructures, {
+    fields: [games.structureId],
+    references: [tournamentStructures.id],
+    relationName: "structure"
+  }),
+  participants: many(gameParticipants, { relationName: "game" }),
+  referrals: many(referrals, { relationName: "game" }),
+  earnings: many(earnings, { relationName: "game" }),
+}));
+
+export const gameParticipantsRelations = relations(gameParticipants, ({ one }) => ({
+  game: one(games, {
+    fields: [gameParticipants.gameId],
+    references: [games.id],
+    relationName: "game"
+  }),
+  user: one(users, {
+    fields: [gameParticipants.userId],
+    references: [users.id],
+    relationName: "participant"
+  }),
+  referrer: one(users, {
+    fields: [gameParticipants.referredBy],
+    references: [users.id]
+  }),
+}));
+
+export const referralsRelations = relations(referrals, ({ one }) => ({
+  referrer: one(users, {
+    fields: [referrals.referrerId],
+    references: [users.id],
+    relationName: "referrer"
+  }),
+  referredUser: one(users, {
+    fields: [referrals.referredUserId],
+    references: [users.id],
+    relationName: "referredUser"
+  }),
+  game: one(games, {
+    fields: [referrals.gameId],
+    references: [games.id],
+    relationName: "game"
+  }),
+}));
+
+export const earningsRelations = relations(earnings, ({ one }) => ({
+  user: one(users, {
+    fields: [earnings.userId],
+    references: [users.id],
+    relationName: "earner"
+  }),
+  game: one(games, {
+    fields: [earnings.gameId],
+    references: [games.id],
+    relationName: "game"
+  }),
+}));
 
 // Export types
 export type User = typeof users.$inferSelect;
