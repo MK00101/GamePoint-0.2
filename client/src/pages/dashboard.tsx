@@ -1,8 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { User, Game } from "@shared/schema";
-import { Sidebar } from "@/components/layout/sidebar";
-import { MobileNav } from "@/components/layout/mobile-nav";
+import { AppLayout } from "@/components/layout/app-layout";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { GameCard } from "@/components/dashboard/game-card";
 import { ReferralSection } from "@/components/dashboard/referral-section";
@@ -10,8 +9,19 @@ import { CreateGameModal } from "@/components/modals/create-game-modal";
 import { JoinGameModal } from "@/components/modals/join-game-modal";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Card, CardContent } from "@/components/ui/card";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
-import { DollarSign, Zap, Users } from "lucide-react";
+import { 
+  DollarSign, 
+  Trophy, 
+  Users, 
+  CalendarDays,
+  PlusCircle,
+  UserPlus,
+  ArrowUpRight,
+  Loader2
+} from "lucide-react";
 import { useLocation } from "wouter";
 
 export default function Dashboard() {
@@ -21,21 +31,18 @@ export default function Dashboard() {
   const [joinGameModalOpen, setJoinGameModalOpen] = useState(false);
 
   // Fetch current user
-  const { data: user, isLoading: isLoadingUser } = useQuery<User | null>({
-    queryKey: ['/api/auth/session'],
-    onError: () => {
-      navigate("/auth");
-    }
+  const { data: user } = useQuery<User | null>({
+    queryKey: ['/api/auth/session']
   });
 
   // Fetch earnings
-  const { data: earnings } = useQuery({
+  const { data: earnings = { total: 0 } } = useQuery<{ total: number }>({
     queryKey: ['/api/earnings'],
     enabled: !!user
   });
 
   // Fetch referrals
-  const { data: referrals } = useQuery({
+  const { data: referrals = { total: 0, totalEarnings: 0 } } = useQuery<{ total: number, totalEarnings: number }>({
     queryKey: ['/api/referrals'],
     enabled: !!user
   });
@@ -64,226 +71,250 @@ export default function Dashboard() {
     enabled: !!user
   });
 
-  if (isLoadingUser) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <p>Loading...</p>
-      </div>
-    );
-  }
+  const lastMonthEarnings = 150; // In a real app, this would come from the API
+  const earningsTrend = {
+    value: "+12%",
+    isPositive: true
+  };
 
-  if (!user) {
-    navigate("/auth");
-    return null;
-  }
+  // Action buttons for the header
+  const actionButtons = (
+    <>
+      <Button
+        variant="outline"
+        size="sm"
+        className="gap-1.5"
+        onClick={() => setJoinGameModalOpen(true)}
+      >
+        <UserPlus className="h-4 w-4" />
+        <span>Join Game</span>
+      </Button>
+      <Button
+        size="sm"
+        className="gap-1.5"
+        onClick={() => setCreateGameModalOpen(true)}
+      >
+        <PlusCircle className="h-4 w-4" />
+        <span>Create Game</span>
+      </Button>
+    </>
+  );
 
   return (
-    <div className="min-h-screen flex flex-col md:flex-row">
-      {/* Mobile Navigation */}
-      <MobileNav user={user} />
+    <AppLayout 
+      title="Dashboard" 
+      subtitle="Welcome back! Here's an overview of your gaming activity."
+      actions={actionButtons}
+    >
+      {/* Stats Section */}
+      <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-10">
+        <StatsCard
+          icon={<DollarSign className="h-6 w-6 text-green-600" />}
+          iconBgColor="bg-green-100"
+          iconColor="text-green-600"
+          title="Total Earnings"
+          value={formatCurrency(earnings.total)}
+          linkText="View earnings history"
+          linkHref="/earnings"
+          trend={earningsTrend}
+        />
 
-      {/* Sidebar for Desktop */}
-      <Sidebar user={user} />
+        <StatsCard
+          icon={<Trophy className="h-6 w-6 text-primary-600" />}
+          iconBgColor="bg-primary-100"
+          iconColor="text-primary-600"
+          title="Games Created"
+          value={createdGames.length}
+          linkText="View all created games"
+          linkHref="/my-games"
+        />
 
-      {/* Main Content */}
-      <div className="md:pl-64 flex flex-col flex-1">
-        <main className="flex-1 pb-16 md:pb-6">
-          <div className="py-6">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
-              {/* Page Header */}
-              <div className="md:flex md:items-center md:justify-between mb-6">
-                <div className="flex-1 min-w-0">
-                  <h1 className="text-2xl font-bold leading-7 text-slate-900 sm:text-3xl sm:truncate">
-                    Dashboard
-                  </h1>
+        <StatsCard
+          icon={<CalendarDays className="h-6 w-6 text-amber-600" />}
+          iconBgColor="bg-amber-100"
+          iconColor="text-amber-600"
+          title="Upcoming Games"
+          value={myGames.filter(g => g.status === 'scheduled').length}
+          linkText="View your upcoming games"
+          linkHref="/upcoming"
+        />
+      </div>
+
+      {/* Tabs */}
+      <div className="mb-6">
+        <div className="sm:hidden">
+          <label htmlFor="tabs" className="sr-only">
+            Select a tab
+          </label>
+          <select
+            id="tabs"
+            name="tabs"
+            className="block w-full rounded-md border-slate-300 focus:border-primary-500 focus:ring-primary-500"
+            value={activeTab}
+            onChange={(e) => setActiveTab(e.target.value)}
+          >
+            <option value="upcoming">My Upcoming Games</option>
+            <option value="available">Available Games</option>
+            <option value="past">Past Games</option>
+          </select>
+        </div>
+        <div className="hidden sm:block">
+          <Tabs
+            value={activeTab}
+            onValueChange={setActiveTab}
+            className="w-full"
+          >
+            <TabsList className="grid w-full grid-cols-3 h-auto p-1 bg-slate-100 rounded-xl">
+              <TabsTrigger 
+                value="upcoming"
+                className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:text-primary-700 data-[state=active]:shadow-sm"
+              >
+                My Upcoming
+              </TabsTrigger>
+              <TabsTrigger 
+                value="available"
+                className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:text-primary-700 data-[state=active]:shadow-sm"
+              >
+                Available Games
+              </TabsTrigger>
+              <TabsTrigger 
+                value="past"
+                className="rounded-lg py-2.5 data-[state=active]:bg-white data-[state=active]:text-primary-700 data-[state=active]:shadow-sm"
+              >
+                Past Games
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </div>
+
+      {/* Games Sections */}
+      <Tabs value={activeTab} className="w-full">
+        <TabsContent value="upcoming" className="mt-4">
+          {isLoadingGames ? (
+            <div className="grid gap-6 mb-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              {[...Array(3)].map((_, i) => (
+                <Card key={i} className="overflow-hidden">
+                  <CardContent className="p-0">
+                    <div className="animate-pulse">
+                      <div className="h-48 bg-slate-200"></div>
+                      <div className="p-4">
+                        <div className="h-4 bg-slate-200 rounded-full w-3/4 mb-2"></div>
+                        <div className="h-4 bg-slate-200 rounded-full w-1/2 mb-4"></div>
+                        <div className="flex justify-between">
+                          <div className="h-8 bg-slate-200 rounded-full w-1/4"></div>
+                          <div className="h-8 bg-slate-200 rounded-full w-1/4"></div>
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : myGames.filter(g => g.status === 'scheduled').length === 0 ? (
+            <Card className="border-dashed border-2 border-slate-200 bg-white/50">
+              <CardContent className="flex flex-col items-center justify-center text-center p-10">
+                <div className="rounded-full bg-primary-50 p-3 mb-4">
+                  <CalendarDays className="h-8 w-8 text-primary-500" />
                 </div>
-                <div className="mt-4 flex md:mt-0 md:ml-4">
+                <h3 className="text-lg font-medium text-slate-900 mb-2">No upcoming games</h3>
+                <p className="text-slate-500 mb-6 max-w-md">You don't have any upcoming games. Join an existing game or create your own!</p>
+                <div className="flex gap-4">
                   <Button
                     variant="outline"
                     onClick={() => setJoinGameModalOpen(true)}
                   >
+                    <UserPlus className="mr-2 h-4 w-4" />
                     Join Game
                   </Button>
-                  <Button
-                    onClick={() => setCreateGameModalOpen(true)}
-                    className="ml-3"
-                  >
+                  <Button onClick={() => setCreateGameModalOpen(true)}>
+                    <PlusCircle className="mr-2 h-4 w-4" />
                     Create Game
                   </Button>
                 </div>
-              </div>
-
-              {/* Stats Section */}
-              <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3 mb-8">
-                <StatsCard
-                  icon={<DollarSign className="h-6 w-6 text-success-600" />}
-                  iconBgColor="bg-success-100"
-                  iconColor="text-success-600"
-                  title="Total Earnings"
-                  value={formatCurrency(earnings?.total || 0)}
-                  linkText="View earnings history"
-                  linkHref="/earnings"
-                />
-
-                <StatsCard
-                  icon={<Zap className="h-6 w-6 text-secondary-600" />}
-                  iconBgColor="bg-secondary-100"
-                  iconColor="text-secondary-600"
-                  title="Games Created"
-                  value={createdGames.length}
-                  linkText="View all created games"
-                  linkHref="/my-games"
-                />
-
-                <StatsCard
-                  icon={<Users className="h-6 w-6 text-warning-600" />}
-                  iconBgColor="bg-warning-100"
-                  iconColor="text-warning-600"
-                  title="Upcoming Games"
-                  value={myGames.filter(g => g.status === 'scheduled').length}
-                  linkText="View your upcoming games"
-                  linkHref="/upcoming"
-                />
-              </div>
-
-              {/* Tabs */}
-              <div className="mb-6">
-                <div className="sm:hidden">
-                  <label htmlFor="tabs" className="sr-only">
-                    Select a tab
-                  </label>
-                  <select
-                    id="tabs"
-                    name="tabs"
-                    className="block w-full rounded-md border-slate-300 focus:border-secondary-500 focus:ring-secondary-500"
-                    value={activeTab}
-                    onChange={(e) => setActiveTab(e.target.value)}
-                  >
-                    <option value="upcoming">My Upcoming Games</option>
-                    <option value="available">Available Games</option>
-                    <option value="past">Past Games</option>
-                  </select>
-                </div>
-                <div className="hidden sm:block">
-                  <div className="border-b border-slate-200">
-                    <Tabs
-                      value={activeTab}
-                      onValueChange={setActiveTab}
-                      className="w-full"
-                    >
-                      <TabsList className="-mb-px flex space-x-8">
-                        <TabsTrigger
-                          value="upcoming"
-                          className="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm data-[state=active]:border-secondary-500 data-[state=active]:text-secondary-600 border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-                        >
-                          My Upcoming Games
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="available"
-                          className="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm data-[state=active]:border-secondary-500 data-[state=active]:text-secondary-600 border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-                        >
-                          Available Games
-                        </TabsTrigger>
-                        <TabsTrigger
-                          value="past"
-                          className="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm data-[state=active]:border-secondary-500 data-[state=active]:text-secondary-600 border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300"
-                        >
-                          Past Games
-                        </TabsTrigger>
-                      </TabsList>
-                    </Tabs>
-                  </div>
-                </div>
-              </div>
-
-              {/* Games Sections */}
-              <Tabs value={activeTab} className="w-full">
-                <TabsContent value="upcoming" className="mt-0">
-                  {isLoadingGames ? (
-                    <div className="text-center p-8">Loading your games...</div>
-                  ) : myGames.filter(g => g.status === 'scheduled').length === 0 ? (
-                    <div className="text-center p-8 bg-white shadow rounded-lg">
-                      <h3 className="text-lg font-medium text-slate-900 mb-2">No upcoming games</h3>
-                      <p className="text-slate-500 mb-4">You don't have any upcoming games. Join an existing game or create your own!</p>
-                      <div className="flex justify-center gap-4">
-                        <Button
-                          variant="outline"
-                          onClick={() => setJoinGameModalOpen(true)}
-                        >
-                          Join Game
-                        </Button>
-                        <Button onClick={() => setCreateGameModalOpen(true)}>
-                          Create Game
-                        </Button>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="grid gap-6 mb-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                      {myGames
-                        .filter(g => g.status === 'scheduled')
-                        .map(game => (
-                          <GameCard
-                            key={game.id}
-                            game={game}
-                            organizerName="Game Master"
-                          />
-                        ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="available" className="mt-0">
-                  {availableGames.length === 0 ? (
-                    <div className="text-center p-8 bg-white shadow rounded-lg">
-                      <h3 className="text-lg font-medium text-slate-900 mb-2">No available games</h3>
-                      <p className="text-slate-500 mb-4">There are no games available right now. Why not create one?</p>
-                      <Button onClick={() => setCreateGameModalOpen(true)}>
-                        Create Game
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="grid gap-6 mb-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                      {availableGames.map(game => (
-                        <GameCard
-                          key={game.id}
-                          game={game}
-                          organizerName="Game Master"
-                        />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-
-                <TabsContent value="past" className="mt-0">
-                  {pastGames.length === 0 ? (
-                    <div className="text-center p-8 bg-white shadow rounded-lg">
-                      <h3 className="text-lg font-medium text-slate-900 mb-2">No past games</h3>
-                      <p className="text-slate-500">You haven't participated in any completed games yet.</p>
-                    </div>
-                  ) : (
-                    <div className="grid gap-6 mb-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
-                      {pastGames.map(game => (
-                        <GameCard
-                          key={game.id}
-                          game={game}
-                          organizerName="Game Master"
-                        />
-                      ))}
-                    </div>
-                  )}
-                </TabsContent>
-              </Tabs>
-
-              {/* Referrals Section */}
-              <ReferralSection
-                username={user.username}
-                totalReferrals={referrals?.total || 0}
-                totalEarnings={referrals?.totalEarnings || 0}
-              />
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-6 mb-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              {myGames
+                .filter(g => g.status === 'scheduled')
+                .map(game => (
+                  <GameCard
+                    key={game.id}
+                    game={game}
+                    organizerName="Game Master"
+                  />
+                ))}
             </div>
-          </div>
-        </main>
-      </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="available" className="mt-4">
+          {availableGames.length === 0 ? (
+            <Card className="border-dashed border-2 border-slate-200 bg-white/50">
+              <CardContent className="flex flex-col items-center justify-center text-center p-10">
+                <div className="rounded-full bg-amber-50 p-3 mb-4">
+                  <Trophy className="h-8 w-8 text-amber-500" />
+                </div>
+                <h3 className="text-lg font-medium text-slate-900 mb-2">No available games</h3>
+                <p className="text-slate-500 mb-6 max-w-md">There are no games available right now. Be the first to create one!</p>
+                <Button onClick={() => setCreateGameModalOpen(true)}>
+                  <PlusCircle className="mr-2 h-4 w-4" />
+                  Create Game
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-6 mb-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              {availableGames.map(game => (
+                <GameCard
+                  key={game.id}
+                  game={game}
+                  organizerName="Game Master"
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+
+        <TabsContent value="past" className="mt-4">
+          {pastGames.length === 0 ? (
+            <Card className="border-dashed border-2 border-slate-200 bg-white/50">
+              <CardContent className="flex flex-col items-center justify-center text-center p-10">
+                <div className="rounded-full bg-slate-100 p-3 mb-4">
+                  <ArrowUpRight className="h-8 w-8 text-slate-500" />
+                </div>
+                <h3 className="text-lg font-medium text-slate-900 mb-2">No past games</h3>
+                <p className="text-slate-500 mb-6 max-w-md">You haven't participated in any completed games yet. Start by joining a game!</p>
+                <Button 
+                  variant="outline"
+                  onClick={() => setJoinGameModalOpen(true)}
+                >
+                  <UserPlus className="mr-2 h-4 w-4" />
+                  Join Game
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="grid gap-6 mb-8 grid-cols-1 md:grid-cols-2 xl:grid-cols-3">
+              {pastGames.map(game => (
+                <GameCard
+                  key={game.id}
+                  game={game}
+                  organizerName="Game Master"
+                />
+              ))}
+            </div>
+          )}
+        </TabsContent>
+      </Tabs>
+
+      {/* Referrals Section */}
+      <ReferralSection
+        username={user?.username || ""}
+        totalReferrals={referrals.total}
+        totalEarnings={referrals.totalEarnings}
+      />
 
       {/* Modals */}
       <CreateGameModal
@@ -296,6 +327,6 @@ export default function Dashboard() {
         onOpenChange={setJoinGameModalOpen}
         userId={user?.id}
       />
-    </div>
+    </AppLayout>
   );
 }
