@@ -1,5 +1,5 @@
 import { createContext, useContext, ReactNode, useState, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import { useLocation } from "wouter";
 import { User } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
@@ -17,58 +17,100 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [_, navigate] = useLocation();
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [user, setUser] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Fetch current user session
-  const { 
-    data: user, 
-    isLoading,
-    refetch 
-  } = useQuery<User | null>({
-    queryKey: ['/api/auth/session'],
-    retry: false,
-    onSuccess: (data) => {
-      if (data) {
-        setIsAuthenticated(true);
-      } else {
+  // Fetch session on component mount
+  useEffect(() => {
+    async function fetchSession() {
+      try {
+        setIsLoading(true);
+        const response = await fetch('/api/auth/session', {
+          credentials: 'include',
+        });
+        
+        if (response.ok) {
+          const userData = await response.json();
+          setUser(userData);
+          setIsAuthenticated(true);
+        } else {
+          setUser(null);
+          setIsAuthenticated(false);
+        }
+      } catch (error) {
+        console.error("Error fetching session:", error);
+        setUser(null);
         setIsAuthenticated(false);
+      } finally {
+        setIsLoading(false);
       }
-    },
-    onError: () => {
-      setIsAuthenticated(false);
     }
-  });
+
+    fetchSession();
+  }, []);
 
   async function login(username: string, password: string) {
     try {
+      setIsLoading(true);
       await apiRequest("POST", "/api/auth/login", { username, password });
-      await refetch();
+      
+      // Fetch user data after successful login
+      const response = await fetch('/api/auth/session', {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+        setIsAuthenticated(true);
+      }
     } catch (error) {
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   }
 
   async function register(userData: any) {
     try {
+      setIsLoading(true);
       await apiRequest("POST", "/api/auth/register", userData);
-      await refetch();
+      
+      // Fetch user data after successful registration
+      const response = await fetch('/api/auth/session', {
+        credentials: 'include',
+      });
+      
+      if (response.ok) {
+        const userData = await response.json();
+        setUser(userData);
+        setIsAuthenticated(true);
+      }
     } catch (error) {
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   }
 
   async function logout() {
     try {
       await apiRequest("POST", "/api/auth/logout", {});
+      setUser(null);
       setIsAuthenticated(false);
-      navigate("/");
+      queryClient.clear();
+      
+      // Use a delay to ensure all state updates have completed
+      setTimeout(() => navigate("/"), 100);
     } catch (error) {
       console.error("Logout failed:", error);
     }
   }
 
-  // Provide authentication context value
-  const value = {
+  // Create context value object
+  const value: AuthContextType = {
     user,
     isLoading,
     login,

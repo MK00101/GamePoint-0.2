@@ -1,31 +1,45 @@
-import { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { AuthForm } from "@/components/ui/auth-form";
-import { User } from "@shared/schema";
+import { useAuth } from "@/context/auth-context";
+import { Loader2 } from "lucide-react";
 
 export default function AuthPage() {
   const [_, navigate] = useLocation();
-  
-  const { data: user, isLoading } = useQuery<User | null>({
-    queryKey: ['/api/auth/session'],
-    retry: false,
-    onError: () => {}
-  });
+  const { user, isLoading, isAuthenticated } = useAuth();
+  const [redirecting, setRedirecting] = useState(false);
   
   useEffect(() => {
-    if (user) {
-      navigate("/dashboard");
+    // If user is authenticated, redirect to dashboard
+    if (isAuthenticated && !redirecting) {
+      setRedirecting(true);
+      const timer = setTimeout(() => {
+        navigate("/dashboard");
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [user, navigate]);
+  }, [isAuthenticated, navigate, redirecting]);
   
   const handleAuthSuccess = () => {
     navigate("/dashboard");
   };
   
+  if (isLoading || redirecting) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-600 mb-4" />
+          <p className="text-sm text-slate-600">
+            {redirecting ? "Redirecting to dashboard..." : "Loading..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+  
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center px-4">
-      {!isLoading && !user && (
+      {!isAuthenticated && (
         <AuthForm onSuccess={handleAuthSuccess} />
       )}
     </div>

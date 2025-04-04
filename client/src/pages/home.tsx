@@ -1,17 +1,37 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/context/auth-context";
+import { Loader2 } from "lucide-react";
 
 export default function Home() {
   const { isAuthenticated, isLoading } = useAuth();
   const [_, navigate] = useLocation();
+  const [redirecting, setRedirecting] = useState(false);
 
   useEffect(() => {
-    if (isAuthenticated && !isLoading) {
-      navigate("/dashboard");
+    // If authenticated and not already redirecting, navigate to dashboard
+    if (isAuthenticated && !isLoading && !redirecting) {
+      setRedirecting(true);
+      const timer = setTimeout(() => {
+        navigate("/dashboard");
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [isAuthenticated, isLoading, navigate]);
+  }, [isAuthenticated, isLoading, navigate, redirecting]);
+  
+  if (isLoading || redirecting) {
+    return (
+      <div className="min-h-screen bg-slate-50 flex items-center justify-center">
+        <div className="flex flex-col items-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary-600 mb-4" />
+          <p className="text-sm text-slate-600">
+            {redirecting ? "Redirecting to dashboard..." : "Loading..."}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
