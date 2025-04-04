@@ -8,6 +8,7 @@ import AuthPage from "@/pages/auth";
 import Home from "@/pages/home";
 import GameDetails from "@/pages/game-details";
 import MyGames from "@/pages/my-games";
+import CreateGame from "@/pages/create-game";
 import UpcomingGames from "@/pages/upcoming-games";
 import Earnings from "@/pages/earnings";
 import Profile from "@/pages/profile";
@@ -23,6 +24,7 @@ function AppRouter() {
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/games/:id" component={GameDetails} />
       <Route path="/my-games" component={MyGames} />
+      <Route path="/create-game" component={CreateGame} />
       <Route path="/upcoming" component={UpcomingGames} />
       <Route path="/earnings" component={Earnings} />
       <Route path="/profile" component={Profile} />
