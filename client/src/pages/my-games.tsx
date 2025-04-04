@@ -4,7 +4,7 @@ import { Game } from "@shared/schema";
 import { AppLayout } from "@/components/layout/app-layout";
 import { GameCard } from "@/components/dashboard/game-card";
 import { Button } from "@/components/ui/button";
-import { CreateGameModal } from "@/components/modals/create-game-modal";
+import { CreateGameModal } from "@/components/modals/create-game-modal-new";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useAuth } from "@/context/auth-context";
 
