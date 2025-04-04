@@ -8,7 +8,7 @@ import {
   earnings, Earning, InsertEarning
 } from "@shared/schema";
 import { db } from "./db";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 
 export interface IStorage {
   // User methods
@@ -437,11 +437,19 @@ export class DatabaseStorage implements IStorage {
   }
 
   async getGameParticipant(gameId: number, userId: number): Promise<GameParticipant | undefined> {
+    console.log(`Looking for participant with gameId=${gameId}, userId=${userId}`);
+    
     const [participant] = await db
       .select()
       .from(gameParticipants)
-      .where(eq(gameParticipants.gameId, gameId) && eq(gameParticipants.userId, userId));
+      .where(
+        and(
+          eq(gameParticipants.gameId, gameId),
+          eq(gameParticipants.userId, userId)
+        )
+      );
     
+    console.log('Found participant:', participant);
     return participant || undefined;
   }
 

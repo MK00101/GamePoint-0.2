@@ -287,36 +287,55 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/games/:id/join', isAuthenticated, async (req: Request, res: Response) => {
     try {
+      console.log('Join game request received');
       const gameId = parseInt(req.params.id);
       const userId = (req.user as any).id;
       const referredBy = req.body.referredBy;
       
+      console.log(`User ${userId} attempting to join game ${gameId}`);
+      
       const game = await storage.getGame(gameId);
       if (!game) {
+        console.log(`Game ${gameId} not found`);
         return res.status(404).json({ message: 'Game not found' });
       }
       
+      console.log('Game found:', game);
+      
       // Check if game is full
       if (game.currentPlayers >= game.maxPlayers) {
+        console.log(`Game ${gameId} is full (${game.currentPlayers}/${game.maxPlayers})`);
         return res.status(400).json({ message: 'Game is full' });
       }
       
       // Check if user already joined
       const existingParticipant = await storage.getGameParticipant(gameId, userId);
       if (existingParticipant) {
+        console.log(`User ${userId} has already joined game ${gameId}`);
         return res.status(400).json({ message: 'Already joined this game' });
       }
       
-      const participantData = insertGameParticipantSchema.parse({
+      console.log('Creating participant data');
+      const participantData = {
         gameId,
         userId,
         referredBy: referredBy || null
-      });
+      };
       
-      const participant = await storage.createGameParticipant(participantData);
+      console.log('Validating participant data:', participantData);
+      const validatedParticipantData = insertGameParticipantSchema.parse(participantData);
+      
+      console.log('Creating game participant');
+      const participant = await storage.createGameParticipant(validatedParticipantData);
+      console.log('Participant created:', participant);
+      
+      // Update game's current player count
+      console.log('Updating game player count');
+      await storage.updateGameStatus(gameId, game.status);
       
       // If referred, create a referral record
       if (referredBy) {
+        console.log(`Creating referral for user ${userId} referred by ${referredBy}`);
         const referralData = insertReferralSchema.parse({
           referrerId: referredBy,
           referredUserId: userId,
@@ -326,11 +345,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
         await storage.createReferral(referralData);
       }
       
+      console.log('Join game successful');
       res.status(201).json(participant);
     } catch (err) {
+      console.error('Error joining game:', err);
+      
       if (err instanceof z.ZodError) {
+        console.error('Validation errors:', JSON.stringify(err.errors));
         return res.status(400).json({ message: 'Invalid participant data', errors: err.errors });
       }
+      
       res.status(500).json({ message: 'Failed to join game' });
     }
   });
