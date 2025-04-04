@@ -208,23 +208,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post('/api/games', isAuthenticated, async (req: Request, res: Response) => {
     try {
+      console.log('Creating new game with request body:', req.body);
       const userId = (req.user as any).id;
+      console.log('User ID from session:', userId);
+      
+      // Pre-process the datetime before validation
+      let processedData = { ...req.body };
+      console.log('Processing game data before validation');
+      
       const gameData = insertGameSchema.parse({
-        ...req.body,
-        gameMasterId: userId
+        ...processedData,
+        gameMasterId: userId,
+        currentPlayers: 0, // Initialize with 0 players
+        status: processedData.status || 'scheduled' // Default status
       });
+      
+      console.log('Game data validated:', gameData);
       
       // Validate entry fee
       if (gameData.entryFee < 1 || gameData.entryFee > 10000) {
+        console.log('Invalid entry fee:', gameData.entryFee);
         return res.status(400).json({ message: 'Entry fee must be between $1 and $10,000' });
       }
       
+      console.log('Creating game in storage');
       const game = await storage.createGame(gameData);
+      console.log('Game created successfully:', game);
+      
       res.status(201).json(game);
     } catch (err) {
+      console.error('Error creating game:', err);
+      
       if (err instanceof z.ZodError) {
+        console.error('Validation errors:', JSON.stringify(err.errors));
         return res.status(400).json({ message: 'Invalid game data', errors: err.errors });
       }
+      
       res.status(500).json({ message: 'Failed to create game' });
     }
   });

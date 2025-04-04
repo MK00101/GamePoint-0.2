@@ -70,6 +70,17 @@ export const insertGameSchema = createInsertSchema(games).omit({
   currentPlayers: true,
   prizePool: true,
   createdAt: true,
+}).extend({
+  // Extend the schema to make datetime parsing more robust
+  datetime: z.string().or(z.date()).transform(val => 
+    typeof val === 'string' ? new Date(val) : val
+  ),
+  // Ensure numeric fields are properly handled
+  maxPlayers: z.number().or(z.string().transform(val => parseInt(val, 10))),
+  entryFee: z.number().or(z.string().transform(val => parseFloat(val))),
+  // Ensure proper references
+  gameTypeId: z.number().or(z.string().transform(val => parseInt(val, 10))),
+  structureId: z.number().or(z.string().transform(val => parseInt(val, 10))),
 });
 
 // Game participants

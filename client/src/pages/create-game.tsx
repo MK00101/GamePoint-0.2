@@ -13,25 +13,21 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 
-// Define the game creation schema
-const createGameFormSchema = insertGameSchema.extend({
-  gameDate: z.string().min(1, {
-    message: "Date is required",
-  }),
-  gameTime: z.string().min(1, {
-    message: "Time is required",
-  }),
-  maxPlayers: z.coerce.number().min(2, {
-    message: "At least 2 players are required",
-  }).max(64, {
-    message: "Maximum 64 players allowed"
-  }),
-  entryFee: z.coerce.number().min(1, {
-    message: "Minimum entry fee is $1",
-  }).max(10000, {
-    message: "Maximum entry fee is $10,000",
-  }),
-  allowRefunds: z.boolean().default(true),
+// Define a simplified game creation schema
+const createGameFormSchema = z.object({
+  name: z.string().min(1, { message: "Game name is required" }),
+  gameTypeId: z.number().or(z.string().transform(v => parseInt(v))),
+  structureId: z.number().or(z.string().transform(v => parseInt(v))),
+  location: z.string().min(1, { message: "Location is required" }),
+  gameDate: z.string().min(1, { message: "Date is required" }),
+  gameTime: z.string().min(1, { message: "Time is required" }),
+  maxPlayers: z.coerce.number().min(2, { message: "At least 2 players are required" })
+    .max(64, { message: "Maximum 64 players allowed" }),
+  entryFee: z.coerce.number().min(1, { message: "Minimum entry fee is $1" })
+    .max(10000, { message: "Maximum entry fee is $10,000" }),
+  isPrivate: z.boolean().default(false),
+  payoutStructure: z.string().min(1, { message: "Payout structure is required" }),
+  status: z.string().optional().default("scheduled"),
 });
 
 type CreateGameFormValues = z.infer<typeof createGameFormSchema>;
@@ -62,7 +58,7 @@ export default function CreateGame() {
       entryFee: 25,
       isPrivate: false,
       payoutStructure: "1st:100",
-      allowRefunds: true,
+      status: "scheduled",
     },
   });
 
@@ -73,6 +69,12 @@ export default function CreateGame() {
     try {
       // Combine date and time into datetime
       const datetime = new Date(`${values.gameDate}T${values.gameTime}`);
+      
+      // Log form values in detail for debugging
+      console.log("Date:", values.gameDate);
+      console.log("Time:", values.gameTime);
+      console.log("Parsed datetime:", datetime);
+      console.log("ISO datetime:", datetime.toISOString());
       
       // Prepare game data
       const gameData = {
@@ -88,9 +90,10 @@ export default function CreateGame() {
         status: "scheduled",
       };
 
-      console.log("Sending game data to server:", gameData);
+      console.log("Sending game data to server:", JSON.stringify(gameData));
       
-      await apiRequest("POST", "/api/games", gameData);
+      const response = await apiRequest("POST", "/api/games", gameData);
+      console.log("Server response:", response);
       
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['/api/games'] });
