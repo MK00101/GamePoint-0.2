@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { User, Game } from "@shared/schema";
+import { Game } from "@shared/schema";
 import { AppLayout } from "@/components/layout/app-layout";
 import { StatsCard } from "@/components/dashboard/stats-card";
 import { GameCard } from "@/components/dashboard/game-card";
@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatCurrency } from "@/lib/utils";
+import { useAuth } from "@/context/auth-context";
 import { 
   DollarSign, 
   Trophy, 
@@ -22,18 +23,14 @@ import {
   ArrowUpRight,
   Loader2
 } from "lucide-react";
-import { useLocation } from "wouter";
 
 export default function Dashboard() {
-  const [_, navigate] = useLocation();
   const [activeTab, setActiveTab] = useState("upcoming");
   const [createGameModalOpen, setCreateGameModalOpen] = useState(false);
   const [joinGameModalOpen, setJoinGameModalOpen] = useState(false);
 
-  // Fetch current user
-  const { data: user } = useQuery<User | null>({
-    queryKey: ['/api/auth/session']
-  });
+  // Use the auth context instead of query to avoid additional requests
+  const { user } = useAuth();
 
   // Fetch earnings
   const { data: earnings = { total: 0 } } = useQuery<{ total: number }>({

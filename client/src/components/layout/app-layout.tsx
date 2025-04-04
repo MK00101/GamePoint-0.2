@@ -18,10 +18,15 @@ export function AppLayout({ children, title, subtitle, actions }: AppLayoutProps
 
   // Use useEffect for navigation to avoid issues during render
   useEffect(() => {
+    // Only redirect if auth check is complete and user is not authenticated
     if (!isLoading && !isAuthenticated) {
-      navigate("/auth");
+      // Using a single-time navigation
+      const timer = setTimeout(() => {
+        navigate("/auth");
+      }, 100);
+      return () => clearTimeout(timer);
     }
-  }, [isLoading, isAuthenticated, navigate]);
+  }, [isLoading, isAuthenticated]);
 
   // Loading state while checking authentication
   if (isLoading) {
