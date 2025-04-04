@@ -171,17 +171,41 @@ export default function PaymentPage() {
     enabled: !!gameId && !successMatch,
   });
   
-  // Create payment intent when the component loads
+  // Join game and create payment intent when the component loads
   useEffect(() => {
     if (!gameId || successMatch || paymentSuccess) return;
     
-    const createPaymentIntent = async () => {
+    const initializePayment = async () => {
       try {
+        // First, attempt to join the game
+        try {
+          await apiRequest("POST", `/api/games/${gameId}/join`, {});
+          console.log("Successfully joined game or already a participant");
+        } catch (error: any) {
+          // If the error is that the user already joined, that's fine, continue
+          // Otherwise, display the error and return
+          if (!error.message.includes("Already joined")) {
+            toast({
+              title: "Error Joining Game",
+              description: error.message,
+              variant: "destructive",
+            });
+            return;
+          }
+        }
+        
+        // Then create the payment intent
         const response = await apiRequest("POST", "/api/create-payment-intent", { gameId });
         const data = await response.json();
         
         setClientSecret(data.clientSecret);
         setAmount(data.amount);
+        
+        // Invalidate relevant queries to refresh data
+        queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
+        queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/participants`] });
+        queryClient.invalidateQueries({ queryKey: ['/api/games/my-games'] });
+        
       } catch (error: any) {
         toast({
           title: "Error",
@@ -191,7 +215,7 @@ export default function PaymentPage() {
       }
     };
     
-    createPaymentIntent();
+    initializePayment();
   }, [gameId, successMatch, paymentSuccess]);
   
   const handlePaymentSuccess = () => {

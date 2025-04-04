@@ -65,28 +65,8 @@ export default function GameDetails() {
   const joinGame = async () => {
     if (!game || !user) return;
     
-    setIsJoining(true);
-    try {
-      await apiRequest("POST", `/api/games/${game.id}/join`, {});
-      
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}`] });
-      queryClient.invalidateQueries({ queryKey: [`/api/games/${gameId}/participants`] });
-      queryClient.invalidateQueries({ queryKey: ['/api/games/my-games'] });
-      
-      toast({
-        title: "Successfully joined game!",
-        description: `You have joined "${game.name}"`,
-      });
-    } catch (error) {
-      toast({
-        title: "Failed to join game",
-        description: "There was an error joining the game. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsJoining(false);
-    }
+    // Redirect to payment page directly
+    window.location.href = `/payment/${game.id}`;
   };
 
   // Get badge color based on game type
@@ -155,7 +135,7 @@ export default function GameDetails() {
             onClick={joinGame}
             disabled={isJoining || game.currentPlayers >= game.maxPlayers}
           >
-            {isJoining ? "Joining..." : `Join Game - ${formatCurrency(game.entryFee)}`}
+            {isJoining ? "Processing..." : `Join & Pay - ${formatCurrency(game.entryFee)}`}
           </Button>
         )
       }
@@ -313,7 +293,7 @@ export default function GameDetails() {
                     className="w-full"
                     disabled={isJoining || game.currentPlayers >= game.maxPlayers}
                   >
-                    {isJoining ? "Joining..." : `Join Game - ${formatCurrency(game.entryFee)}`}
+                    {isJoining ? "Processing..." : `Join & Pay - ${formatCurrency(game.entryFee)}`}
                   </Button>
                 )}
                 
