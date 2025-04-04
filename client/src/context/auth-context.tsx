@@ -1,6 +1,5 @@
 import { createContext, useContext, ReactNode, useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useLocation } from "wouter";
 import { User } from "@shared/schema";
 import { apiRequest } from "@/lib/queryClient";
 
@@ -16,7 +15,6 @@ interface AuthContextType {
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-  const [_, navigate] = useLocation();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -102,8 +100,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAuthenticated(false);
       queryClient.clear();
       
-      // Use a delay to ensure all state updates have completed
-      setTimeout(() => navigate("/"), 100);
+      // Use direct window location change for reliable redirect
+      window.location.href = "/";
     } catch (error) {
       console.error("Logout failed:", error);
     }

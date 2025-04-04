@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useState } from "react";
+import { ReactNode, useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
 import { useAuth } from "@/context/auth-context";
@@ -14,22 +14,19 @@ interface AppLayoutProps {
 
 export function AppLayout({ children, title, subtitle, actions }: AppLayoutProps) {
   const { user, isAuthenticated, isLoading } = useAuth();
-  const [_, navigate] = useLocation();
-  const [redirecting, setRedirecting] = useState(false);
-
+  const [location, navigate] = useLocation();
+  
+  // Simple redirect if not authenticated - only runs once after initial load
   useEffect(() => {
-    // Only redirect if auth check is complete, user is not authenticated, and not already redirecting
-    if (!isLoading && !isAuthenticated && !redirecting) {
-      setRedirecting(true);
-      
-      // Using a timeout to avoid immediate navigation during render
-      const timer = setTimeout(() => {
-        navigate("/auth");
-      }, 300);
-      
-      return () => clearTimeout(timer);
+    let isMounted = true;
+    
+    // Only redirect if we're sure the user isn't authenticated
+    if (!isLoading && !isAuthenticated && isMounted) {
+      window.location.href = "/auth"; // Use direct window location for reliable redirect
     }
-  }, [isLoading, isAuthenticated, redirecting]);
+    
+    return () => { isMounted = false; };
+  }, [isLoading, isAuthenticated]);
 
   // Loading state while checking authentication
   if (isLoading) {
@@ -43,8 +40,8 @@ export function AppLayout({ children, title, subtitle, actions }: AppLayoutProps
     );
   }
 
-  // Return early if not authenticated or redirecting
-  if (!isAuthenticated || redirecting) {
+  // Return early if not authenticated
+  if (!isAuthenticated) {
     return (
       <div className="flex items-center justify-center min-h-screen">
         <div className="flex flex-col items-center">

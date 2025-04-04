@@ -13,7 +13,8 @@ import Earnings from "@/pages/earnings";
 import Profile from "@/pages/profile";
 import { AuthProvider } from "@/context/auth-context";
 
-function Router() {
+// Simple router with fixed routes
+function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={Home} />
@@ -33,7 +34,7 @@ function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Router />
+        <AppRouter />
         <Toaster />
       </AuthProvider>
     </QueryClientProvider>
