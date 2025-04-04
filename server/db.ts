@@ -3,6 +3,7 @@ import { NodePgDatabase } from 'drizzle-orm/node-postgres/driver';
 import pkg from 'pg';
 const { Pool } = pkg;
 import * as schema from '@shared/schema';
+import { hashPassword } from './auth-utils';
 
 // Initialize connection pool
 const pool = new Pool({
@@ -159,11 +160,14 @@ async function seedInitialData() {
     // Check if we already have a test user
     const usersResult = await pool.query('SELECT COUNT(*) FROM users');
     if (parseInt(usersResult.rows[0].count) === 0) {
-      // Insert a test user
+      // Hash the password
+      const hashedPassword = await hashPassword('password123');
+      
+      // Insert a test user with hashed password
       await pool.query(`
         INSERT INTO users (username, password, email, full_name, avatar_url) VALUES
-        ('testuser', 'password123', 'test@example.com', 'Test User', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80')
-      `);
+        ('testuser', $1, 'test@example.com', 'Test User', 'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?ixlib=rb-1.2.1&ixid=eyJhcHBfaWQiOjEyMDd9&auto=format&fit=facearea&facepad=2&w=256&h=256&q=80')
+      `, [hashedPassword]);
     }
 
     console.log('Initial data seeded successfully');

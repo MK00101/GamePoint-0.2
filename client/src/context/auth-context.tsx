@@ -52,20 +52,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function login(username: string, password: string) {
     try {
       setIsLoading(true);
-      await apiRequest("POST", "/api/auth/login", { username, password });
+      const response = await apiRequest("POST", "/api/auth/login", { username, password });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Login failed. Please check your credentials.');
+      }
       
       // Fetch user data after successful login
-      const response = await fetch('/api/auth/session', {
+      const sessionResponse = await fetch('/api/auth/session', {
         credentials: 'include',
       });
       
-      if (response.ok) {
-        const userData = await response.json();
+      if (sessionResponse.ok) {
+        const userData = await sessionResponse.json();
         setUser(userData);
         setIsAuthenticated(true);
+      } else {
+        throw new Error('Failed to retrieve user session after login');
       }
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      console.error("Login error:", error);
+      throw new Error(error.message || 'Login failed. Please try again.');
     } finally {
       setIsLoading(false);
     }
@@ -74,20 +82,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   async function register(userData: any) {
     try {
       setIsLoading(true);
-      await apiRequest("POST", "/api/auth/register", userData);
+      const response = await apiRequest("POST", "/api/auth/register", userData);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Registration failed. Please try again.');
+      }
       
       // Fetch user data after successful registration
-      const response = await fetch('/api/auth/session', {
+      const sessionResponse = await fetch('/api/auth/session', {
         credentials: 'include',
       });
       
-      if (response.ok) {
-        const userData = await response.json();
+      if (sessionResponse.ok) {
+        const userData = await sessionResponse.json();
         setUser(userData);
         setIsAuthenticated(true);
+      } else {
+        throw new Error('Failed to get user session after registration');
       }
-    } catch (error) {
-      throw error;
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      throw new Error(error.message || 'Registration failed. Please try again.');
     } finally {
       setIsLoading(false);
     }

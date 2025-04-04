@@ -2,8 +2,30 @@ import express, { type Request, Response, NextFunction } from "express";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { initDb } from "./db";
+import helmet from "helmet";
+import cookieParser from "cookie-parser";
+import cors from "cors";
 
 const app = express();
+
+// Security middlewares
+app.use(helmet({
+  // Disable CSP for development to avoid issues with Vite's HMR
+  contentSecurityPolicy: process.env.NODE_ENV === 'production',
+  // Disable crossOriginEmbedderPolicy during development
+  crossOriginEmbedderPolicy: false
+}));
+
+// Configure CORS
+app.use(cors({
+  origin: process.env.CORS_ORIGIN || "*",
+  credentials: true
+}));
+
+// Parse cookies
+app.use(cookieParser());
+
+// Parse JSON and URL-encoded bodies
 app.use(express.json());
 app.use(express.urlencoded({ extended: false }));
 

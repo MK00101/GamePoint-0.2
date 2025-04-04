@@ -80,16 +80,41 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
   async function onLoginSubmit(values: LoginFormValues) {
     setIsLoading(true);
     try {
-      await apiRequest("POST", "/api/auth/login", values);
+      const response = await apiRequest("POST", "/api/auth/login", values);
+      
+      if (!response.ok) {
+        // If we get here, the apiRequest didn't throw, which is unexpected
+        // Let's try to parse the error response
+        const errorData = await response.json().catch(() => ({ message: "Login failed" }));
+        throw new Error(errorData.message || "Please check your credentials and try again");
+      }
+      
       toast({
         title: "Login successful!",
         description: "Welcome back to GameOn!",
       });
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Login error:", error);
+      
+      // Extract error message from error object
+      let errorMessage = "Please check your credentials and try again.";
+      if (error instanceof Error) {
+        // Try to parse JSON error message if it exists
+        try {
+          const parsedError = error.message.split(': ')[1];
+          if (parsedError) {
+            const jsonError = JSON.parse(parsedError);
+            errorMessage = jsonError.message || errorMessage;
+          }
+        } catch {
+          errorMessage = error.message || errorMessage;
+        }
+      }
+      
       toast({
         title: "Login failed",
-        description: "Please check your credentials and try again.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -102,16 +127,41 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
     try {
       // Remove confirmPassword as it's not needed in the API call
       const { confirmPassword, ...registerData } = values;
-      await apiRequest("POST", "/api/auth/register", registerData);
+      const response = await apiRequest("POST", "/api/auth/register", registerData);
+      
+      if (!response.ok) {
+        // If we get here, the apiRequest didn't throw, which is unexpected
+        // Let's try to parse the error response
+        const errorData = await response.json().catch(() => ({ message: "Registration failed" }));
+        throw new Error(errorData.message || "Registration failed. Please try again.");
+      }
+      
       toast({
         title: "Registration successful!",
         description: "Welcome to GameOn!",
       });
       onSuccess();
-    } catch (error) {
+    } catch (error: any) {
+      console.error("Registration error:", error);
+      
+      // Extract error message from error object
+      let errorMessage = "This username or email may already be in use.";
+      if (error instanceof Error) {
+        // Try to parse JSON error message if it exists
+        try {
+          const parsedError = error.message.split(': ')[1];
+          if (parsedError) {
+            const jsonError = JSON.parse(parsedError);
+            errorMessage = jsonError.message || errorMessage;
+          }
+        } catch {
+          errorMessage = error.message || errorMessage;
+        }
+      }
+      
       toast({
         title: "Registration failed",
-        description: "This username or email may already be in use.",
+        description: errorMessage,
         variant: "destructive",
       });
     } finally {
@@ -120,15 +170,17 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
   }
 
   return (
-    <Card className="w-full max-w-md">
-      <CardHeader>
-        <CardTitle className="text-2xl font-bold text-center">GameOn</CardTitle>
+    <Card className="w-full max-w-md shadow-lg border-0">
+      <CardHeader className="pb-4">
+        <CardTitle className="text-2xl font-bold text-center bg-gradient-to-r from-primary to-purple-600 bg-clip-text text-transparent">
+          Welcome to GameOn
+        </CardTitle>
       </CardHeader>
       <CardContent>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
           <TabsList className="grid w-full grid-cols-2 mb-6">
-            <TabsTrigger value="login">Login</TabsTrigger>
-            <TabsTrigger value="register">Register</TabsTrigger>
+            <TabsTrigger value="login" className="text-sm">Sign In</TabsTrigger>
+            <TabsTrigger value="register" className="text-sm">Create Account</TabsTrigger>
           </TabsList>
           <TabsContent value="login">
             <Form {...loginForm}>
@@ -168,10 +220,10 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
                 />
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-500 text-white font-medium"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Logging in..." : "Login"}
+                  {isLoading ? "Logging in..." : "Sign In"}
                 </Button>
               </form>
             </Form>
@@ -261,10 +313,10 @@ export function AuthForm({ onSuccess }: AuthFormProps) {
                 />
                 <Button
                   type="submit"
-                  className="w-full"
+                  className="w-full bg-gradient-to-r from-primary to-purple-600 hover:from-primary/90 hover:to-purple-500 text-white font-medium"
                   disabled={isLoading}
                 >
-                  {isLoading ? "Creating account..." : "Register"}
+                  {isLoading ? "Creating account..." : "Create Account"}
                 </Button>
               </form>
             </Form>

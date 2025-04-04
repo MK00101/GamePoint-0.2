@@ -1,4 +1,4 @@
-import type { Express, Request, Response } from "express";
+import type { Express, Request, Response, NextFunction } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { 
@@ -13,6 +13,8 @@ import MemoryStore from "memorystore";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
 import Stripe from "stripe";
+import { hashPassword, verifyPassword, sanitizeUser } from "./auth-utils";
+import { rateLimit } from "express-rate-limit";
 
 // Initialize Stripe
 if (!process.env.STRIPE_SECRET_KEY) {
@@ -40,17 +42,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.use(passport.initialize());
   app.use(passport.session());
 
-  // Configure passport local strategy
+  // Configure passport local strategy with secure password verification
   passport.use(new LocalStrategy(
     async (username, password, done) => {
       try {
         const user = await storage.getUserByUsername(username);
         if (!user) {
-          return done(null, false, { message: 'Incorrect username' });
+          return done(null, false, { message: 'Incorrect username or password' });
         }
-        if (user.password !== password) { // In production, use proper password hashing
-          return done(null, false, { message: 'Incorrect password' });
+        
+        // Verify password using secure hashing
+        const isPasswordValid = await verifyPassword(user.password, password);
+        if (!isPasswordValid) {
+          return done(null, false, { message: 'Incorrect username or password' });
         }
+        
         return done(null, user);
       } catch (err) {
         return done(err);
@@ -71,7 +77,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Auth Routes
+  // Setup rate limiting for authentication routes
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10, // Limit each IP to 10 requests per window
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many login attempts, please try again later' }
+  });
+
+  // Auth Routes with rate limiting
   app.post('/api/auth/register', async (req: Request, res: Response) => {
     try {
       const userData = insertUserSchema.parse(req.body);
@@ -86,16 +101,23 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Email already exists' });
       }
       
-      const user = await storage.createUser(userData);
+      // Hash the password before storing
+      const hashedPassword = await hashPassword(userData.password);
       
-      // Strip password from response
-      const { password, ...userResponse } = user;
+      // Create user with hashed password
+      const user = await storage.createUser({
+        ...userData,
+        password: hashedPassword
+      });
+      
+      // Sanitize user object for response
+      const sanitizedUser = sanitizeUser(user);
       
       req.login(user, (err) => {
         if (err) {
           return res.status(500).json({ message: 'Failed to log in after registration' });
         }
-        return res.status(201).json(userResponse);
+        return res.status(201).json(sanitizedUser);
       });
       
     } catch (err) {
@@ -106,9 +128,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/auth/login', passport.authenticate('local'), (req: Request, res: Response) => {
-    const { password, ...user } = req.user as any;
-    res.json(user);
+  app.post('/api/auth/login', authLimiter, passport.authenticate('local'), (req: Request, res: Response) => {
+    const sanitizedUser = sanitizeUser(req.user as any);
+    res.json(sanitizedUser);
   });
 
   app.post('/api/auth/logout', (req: Request, res: Response) => {
@@ -119,8 +141,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get('/api/auth/session', (req: Request, res: Response) => {
     if (req.isAuthenticated()) {
-      const { password, ...user } = req.user as any;
-      return res.json(user);
+      const sanitizedUser = sanitizeUser(req.user as any);
+      return res.json(sanitizedUser);
     }
     res.status(401).json({ message: 'Not authenticated' });
   });
