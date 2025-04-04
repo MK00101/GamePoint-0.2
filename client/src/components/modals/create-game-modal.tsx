@@ -153,6 +153,8 @@ export function CreateGameModal({ open, onOpenChange }: CreateGameModalProps) {
   const distribution = calculatePrizeDistribution(prizePool);
 
   const handleNext = () => {
+    console.log("handleNext called, current step:", currentStep);
+    
     if (currentStep === 1) {
       // Validate first step fields
       form.trigger(["name", "gameTypeId", "structureId", "location", "gameDate", "gameTime", "maxPlayers", "isPrivate"]);
@@ -166,7 +168,10 @@ export function CreateGameModal({ open, onOpenChange }: CreateGameModalProps) {
                         !!form.formState.errors.maxPlayers;
       
       if (!hasErrors) {
+        console.log("Moving to step 2");
         setCurrentStep(2);
+      } else {
+        console.log("Step 1 validation errors:", form.formState.errors);
       }
     } else if (currentStep === 2) {
       // Validate second step fields
@@ -176,11 +181,13 @@ export function CreateGameModal({ open, onOpenChange }: CreateGameModalProps) {
                         !!form.formState.errors.payoutStructure;
       
       if (!hasErrors) {
+        console.log("Moving to step 3");
         setCurrentStep(3);
+      } else {
+        console.log("Step 2 validation errors:", form.formState.errors);
       }
-    } else if (currentStep === 3) {
-      form.handleSubmit(onSubmit)();
     }
+    // We don't need this anymore since we're using a dedicated submit button in step 3
   };
 
   const handleBack = () => {
@@ -197,6 +204,7 @@ export function CreateGameModal({ open, onOpenChange }: CreateGameModalProps) {
   };
 
   const onSubmit = async (values: CreateGameFormValues) => {
+    console.log("Submit function called with values:", values);
     setIsSubmitting(true);
     try {
       // Combine date and time into datetime
@@ -216,10 +224,14 @@ export function CreateGameModal({ open, onOpenChange }: CreateGameModalProps) {
         status: "scheduled",
       };
 
-      await apiRequest("POST", "/api/games", gameData);
+      console.log("Sending game data to server:", gameData);
+      const response = await apiRequest("POST", "/api/games", gameData);
+      console.log("Server response:", response);
       
       // Invalidate relevant queries
       queryClient.invalidateQueries({ queryKey: ['/api/games'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/games/created'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/games/my-games'] });
       
       toast({
         title: "Game created successfully!",
@@ -229,6 +241,7 @@ export function CreateGameModal({ open, onOpenChange }: CreateGameModalProps) {
       onOpenChange(false);
       resetModal();
     } catch (error) {
+      console.error("Error creating game:", error);
       toast({
         title: "Failed to create game",
         description: "There was an error creating your game. Please try again.",
@@ -624,17 +637,23 @@ export function CreateGameModal({ open, onOpenChange }: CreateGameModalProps) {
             >
               Cancel
             </Button>
-            <Button
-              type="button"
-              onClick={handleNext}
-              disabled={isSubmitting}
-            >
-              {currentStep === 3
-                ? isSubmitting
-                  ? "Creating..."
-                  : "Create Game"
-                : "Next"}
-            </Button>
+            {currentStep === 3 ? (
+              <Button
+                type="submit"
+                onClick={form.handleSubmit(onSubmit)}
+                disabled={isSubmitting}
+              >
+                {isSubmitting ? "Creating..." : "Create Game"}
+              </Button>
+            ) : (
+              <Button
+                type="button"
+                onClick={handleNext}
+                disabled={isSubmitting}
+              >
+                Next
+              </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>
