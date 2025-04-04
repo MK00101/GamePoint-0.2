@@ -38,7 +38,7 @@ export default function GameDetails() {
   });
 
   // Fetch game participants
-  const { data: participants = [], isLoading: isLoadingParticipants } = useQuery({
+  const { data: participants = [], isLoading: isLoadingParticipants } = useQuery<any[]>({
     queryKey: [`/api/games/${gameId}/participants`],
     enabled: !!gameId,
   });
@@ -318,19 +318,49 @@ export default function GameDetails() {
                 )}
                 
                 {hasJoined && game.status === 'scheduled' && (
-                  <div className="bg-green-50 p-4 rounded-md">
-                    <div className="flex">
-                      <div className="flex-shrink-0">
-                        <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
-                          <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                        </svg>
-                      </div>
-                      <div className="ml-3">
-                        <p className="text-sm font-medium text-green-800">
-                          You have successfully joined this game!
-                        </p>
+                  <div className="space-y-4">
+                    <div className="bg-green-50 p-4 rounded-md">
+                      <div className="flex">
+                        <div className="flex-shrink-0">
+                          <svg className="h-5 w-5 text-green-400" fill="currentColor" viewBox="0 0 20 20">
+                            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                          </svg>
+                        </div>
+                        <div className="ml-3">
+                          <p className="text-sm font-medium text-green-800">
+                            You have successfully joined this game!
+                          </p>
+                        </div>
                       </div>
                     </div>
+                    
+                    {/* Payment button for joined users */}
+                    {hasJoined && !participants.find(p => p.userId === user?.id)?.hasPaid && (
+                      <Button 
+                        className="w-full" 
+                        onClick={() => window.location.href = `/payment/${game.id}`}
+                      >
+                        Pay Entry Fee - {formatCurrency(game.entryFee)}
+                      </Button>
+                    )}
+                    
+                    {/* Payment confirmation for users who already paid */}
+                    {hasJoined && participants.find(p => p.userId === user?.id)?.hasPaid && (
+                      <div className="bg-blue-50 p-4 rounded-md">
+                        <div className="flex">
+                          <div className="flex-shrink-0">
+                            <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
+                              <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                            </svg>
+                          </div>
+                          <div className="ml-3">
+                            <p className="text-sm font-medium text-blue-800">
+                              Payment completed! You're all set for this game.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
                 

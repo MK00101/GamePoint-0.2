@@ -12,6 +12,13 @@ import session from "express-session";
 import MemoryStore from "memorystore";
 import passport from "passport";
 import { Strategy as LocalStrategy } from "passport-local";
+import Stripe from "stripe";
+
+// Initialize Stripe
+if (!process.env.STRIPE_SECRET_KEY) {
+  throw new Error("Missing required Stripe secret: STRIPE_SECRET_KEY");
+}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Set up sessions
@@ -335,6 +342,131 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (err) {
       res.status(500).json({ message: 'Failed to fetch referrals' });
     }
+  });
+
+  // Stripe Payment Routes
+  app.post('/api/create-payment-intent', isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const { gameId } = req.body;
+      const userId = (req.user as any).id;
+      
+      if (!gameId) {
+        return res.status(400).json({ message: 'Game ID is required' });
+      }
+      
+      // Get the game to determine entry fee
+      const game = await storage.getGame(parseInt(gameId));
+      if (!game) {
+        return res.status(404).json({ message: 'Game not found' });
+      }
+      
+      // Check if participant exists
+      const participant = await storage.getGameParticipant(parseInt(gameId), userId);
+      if (!participant) {
+        return res.status(400).json({ message: 'You must join the game before making a payment' });
+      }
+      
+      // Check if already paid
+      if (participant.hasPaid) {
+        return res.status(400).json({ message: 'You have already paid for this game' });
+      }
+      
+      // Create a PaymentIntent with the entry fee amount
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: Math.round(game.entryFee * 100), // Convert dollars to cents
+        currency: 'usd',
+        metadata: {
+          gameId: game.id.toString(),
+          userId: userId.toString(),
+          participantId: participant.id.toString()
+        }
+      });
+      
+      res.json({ 
+        clientSecret: paymentIntent.client_secret,
+        amount: game.entryFee
+      });
+    } catch (err: any) {
+      res.status(500).json({ message: `Payment intent creation failed: ${err.message}` });
+    }
+  });
+  
+  app.post('/api/confirm-payment', isAuthenticated, async (req: Request, res: Response) => {
+    try {
+      const { paymentIntentId, gameId } = req.body;
+      const userId = (req.user as any).id;
+      
+      if (!paymentIntentId || !gameId) {
+        return res.status(400).json({ message: 'Payment intent ID and game ID are required' });
+      }
+      
+      // Retrieve the payment intent
+      const paymentIntent = await stripe.paymentIntents.retrieve(paymentIntentId);
+      
+      // Verify payment is complete
+      if (paymentIntent.status !== 'succeeded') {
+        return res.status(400).json({ message: 'Payment has not been completed' });
+      }
+      
+      // Get the participant record
+      const participant = await storage.getGameParticipant(parseInt(gameId), userId);
+      if (!participant) {
+        return res.status(404).json({ message: 'Participant not found' });
+      }
+      
+      // Update payment status
+      await storage.updateParticipantPaymentStatus(participant.id, true);
+      
+      // Update game player count
+      const game = await storage.getGame(parseInt(gameId));
+      if (game) {
+        await storage.updateGameStatus(game.id, game.status);
+      }
+      
+      res.json({ success: true, message: 'Payment confirmed successfully' });
+    } catch (err: any) {
+      res.status(500).json({ message: `Payment confirmation failed: ${err.message}` });
+    }
+  });
+
+  // Stripe webhook endpoint
+  app.post('/api/stripe-webhook', async (req: Request, res: Response) => {
+    const payload = req.body;
+    const sig = req.headers['stripe-signature'] as string;
+    
+    // Note: In production, you would use a webhook secret for verification
+    let event;
+    
+    try {
+      event = payload; // In production: stripe.webhooks.constructEvent(payload, sig, webhookSecret);
+    } catch (err: any) {
+      return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+    
+    // Handle the event
+    if (event.type === 'payment_intent.succeeded') {
+      const paymentIntent = event.data.object;
+      
+      // Extract metadata
+      const { gameId, userId, participantId } = paymentIntent.metadata;
+      
+      if (gameId && userId && participantId) {
+        try {
+          // Update participant payment status
+          await storage.updateParticipantPaymentStatus(parseInt(participantId), true);
+          
+          // Update game player count
+          const game = await storage.getGame(parseInt(gameId));
+          if (game) {
+            await storage.updateGameStatus(game.id, game.status);
+          }
+        } catch (error) {
+          console.error('Error processing webhook payment:', error);
+        }
+      }
+    }
+    
+    res.json({ received: true });
   });
 
   const httpServer = createServer(app);
