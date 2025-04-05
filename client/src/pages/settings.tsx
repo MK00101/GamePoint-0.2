@@ -40,7 +40,7 @@ interface ExtendedUserProfile {
   username: string;
   email: string;
   fullName: string;
-  avatarUrl?: string | null;
+  avatarUrl?: string;
   bio?: string;
   referrerCode?: string;
 }
@@ -124,7 +124,7 @@ export default function SettingsPage() {
         username: user.username,
         email: user.email,
         fullName: user.fullName,
-        avatarUrl: user.avatarUrl || "",
+        avatarUrl: user.avatarUrl === null ? "" : user.avatarUrl,
         // These fields don't exist in the schema, but we're using them in the UI
         bio: "Games enthusiast and competitor",
         referrerCode: "",

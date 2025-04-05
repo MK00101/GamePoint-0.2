@@ -8,6 +8,9 @@ import cors from "cors";
 
 const app = express();
 
+// Enable trust proxy for proper rate limiting with X-Forwarded-For headers
+app.set('trust proxy', 1);
+
 // Security middlewares
 app.use(helmet({
   // Disable CSP for development to avoid issues with Vite's HMR

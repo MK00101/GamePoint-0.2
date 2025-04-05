@@ -16,24 +16,30 @@ import Payment from "@/pages/payment";
 import Notifications from "@/pages/notifications";
 import Settings from "@/pages/settings";
 import { AuthProvider } from "@/context/auth-context";
+import { ProtectedRoute } from "./lib/protected-route";
 
-// Simple router with fixed routes
+// Router with protected and public routes
 function AppRouter() {
   return (
     <Switch>
+      {/* Public routes */}
       <Route path="/" component={Home} />
       <Route path="/auth" component={AuthPage} />
-      <Route path="/dashboard" component={Dashboard} />
       <Route path="/games/:id" component={GameDetails} />
-      <Route path="/my-games" component={MyGames} />
-      <Route path="/create-game" component={CreateGame} />
       <Route path="/upcoming" component={UpcomingGames} />
-      <Route path="/earnings" component={Earnings} />
-      <Route path="/profile" component={Profile} />
-      <Route path="/payment/:gameId" component={Payment} />
-      <Route path="/payment/success" component={Payment} />
-      <Route path="/notifications" component={Notifications} />
-      <Route path="/settings" component={Settings} />
+      
+      {/* Protected routes */}
+      <ProtectedRoute path="/dashboard" component={Dashboard} />
+      <ProtectedRoute path="/my-games" component={MyGames} />
+      <ProtectedRoute path="/create-game" component={CreateGame} />
+      <ProtectedRoute path="/earnings" component={Earnings} />
+      <ProtectedRoute path="/profile" component={Profile} />
+      <ProtectedRoute path="/payment/:gameId" component={Payment} />
+      <ProtectedRoute path="/payment/success" component={Payment} />
+      <ProtectedRoute path="/notifications" component={Notifications} />
+      <ProtectedRoute path="/settings" component={Settings} />
+      
+      {/* Fallback route */}
       <Route component={NotFound} />
     </Switch>
   );
