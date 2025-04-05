@@ -13,6 +13,8 @@ import UpcomingGames from "@/pages/upcoming-games";
 import Earnings from "@/pages/earnings";
 import Profile from "@/pages/profile";
 import Payment from "@/pages/payment";
+import Notifications from "@/pages/notifications";
+import Settings from "@/pages/settings";
 import { AuthProvider } from "@/context/auth-context";
 
 // Simple router with fixed routes
@@ -30,6 +32,8 @@ function AppRouter() {
       <Route path="/profile" component={Profile} />
       <Route path="/payment/:gameId" component={Payment} />
       <Route path="/payment/success" component={Payment} />
+      <Route path="/notifications" component={Notifications} />
+      <Route path="/settings" component={Settings} />
       <Route component={NotFound} />
     </Switch>
   );
