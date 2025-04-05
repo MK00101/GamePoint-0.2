@@ -78,16 +78,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Setup rate limiting for authentication routes
-  const authLimiter = rateLimit({
+  const loginLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 10, // Limit each IP to 10 requests per window
+    max: 5, // Limit each IP to 5 login attempts per window
     standardHeaders: true,
     legacyHeaders: false,
-    message: { message: 'Too many login attempts, please try again later' }
+    message: { message: 'Too many login attempts, please try again later' },
+    skipSuccessfulRequests: true, // Don't count successful logins against the limit
   });
+  
+  // More lenient rate limiting for registration
+  const registerLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 3, // Limit each IP to 3 registrations per hour
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many registration attempts, please try again later' },
+  });
+  
+  // Global API rate limiting
+  const apiLimiter = rateLimit({
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    max: 100, // 100 requests per 5 minutes
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { message: 'Too many requests, please try again later' },
+    skip: (req) => {
+      // Skip this limiter for auth routes that have their own limiters
+      return req.path.startsWith('/api/auth/');
+    }
+  });
+  
+  // Apply global API rate limiting
+  app.use('/api/', apiLimiter);
 
   // Auth Routes with rate limiting
-  app.post('/api/auth/register', async (req: Request, res: Response) => {
+  app.post('/api/auth/register', registerLimiter, async (req: Request, res: Response) => {
     try {
       const userData = insertUserSchema.parse(req.body);
       const existingUser = await storage.getUserByUsername(userData.username);
@@ -128,7 +154,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post('/api/auth/login', authLimiter, passport.authenticate('local'), (req: Request, res: Response) => {
+  app.post('/api/auth/login', loginLimiter, passport.authenticate('local'), (req: Request, res: Response) => {
     const sanitizedUser = sanitizeUser(req.user as any);
     res.json(sanitizedUser);
   });

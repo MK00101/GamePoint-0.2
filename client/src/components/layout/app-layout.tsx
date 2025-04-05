@@ -1,6 +1,7 @@
 import { ReactNode, useEffect } from "react";
 import { Sidebar } from "@/components/layout/sidebar";
 import { MobileNav } from "@/components/layout/mobile-nav";
+import { Header } from "@/components/layout/header";
 import { useAuth } from "@/context/auth-context";
 import { useLocation } from "wouter";
 import { Loader2 } from "lucide-react";
@@ -62,6 +63,9 @@ export function AppLayout({ children, title, subtitle, actions }: AppLayoutProps
 
       {/* Main Content */}
       <div className="md:pl-64 flex flex-col flex-1">
+        {/* Header with Profile Dropdown */}
+        <Header user={user} actions={actions} />
+        
         <main className="flex-1 pb-16 md:pb-6">
           <div className="py-6">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 md:px-8">
@@ -77,11 +81,10 @@ export function AppLayout({ children, title, subtitle, actions }: AppLayoutProps
                     </p>
                   )}
                 </div>
-                {actions && (
-                  <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4">
-                    {actions}
-                  </div>
-                )}
+                {/* Only show actions here on mobile */}
+                <div className="mt-4 flex space-x-3 md:mt-0 md:ml-4 md:hidden">
+                  {actions}
+                </div>
               </div>
 
               {/* Page Content */}
